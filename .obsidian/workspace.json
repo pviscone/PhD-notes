@@ -4,16 +4,16 @@
     "type": "split",
     "children": [
       {
-        "id": "d121408b56b0927a",
+        "id": "8f959826d7eed25c",
         "type": "tabs",
         "children": [
           {
-            "id": "ba30447990268e5f",
+            "id": "8fea2a27798aa786",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Referenze.md",
+                "file": "Dubbi.md",
                 "mode": "source",
                 "source": false
               }
@@ -64,6 +64,30 @@
               "type": "bookmarks",
               "state": {}
             }
+          },
+          {
+            "id": "4abbe92f45eaab77",
+            "type": "leaf",
+            "state": {
+              "type": "recent-files",
+              "state": {}
+            }
+          },
+          {
+            "id": "b4f8833aaeb9d66e",
+            "type": "leaf",
+            "state": {
+              "type": "mk-path-view",
+              "state": {}
+            }
+          },
+          {
+            "id": "b82094eda43631db",
+            "type": "leaf",
+            "state": {
+              "type": "file-tree-view",
+              "state": {}
+            }
           }
         ]
       }
@@ -85,7 +109,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Referenze.md",
+                "file": "Dubbi.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -102,7 +126,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Referenze.md",
+                "file": "Dubbi.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -125,8 +149,16 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Referenze.md"
+                "file": "Dubbi.md"
               }
+            }
+          },
+          {
+            "id": "1db461c0f7dbcd81",
+            "type": "leaf",
+            "state": {
+              "type": "calendar",
+              "state": {}
             }
           }
         ]
@@ -143,12 +175,23 @@
       "canvas:Create new canvas": false,
       "daily-notes:Open today's daily note": false,
       "templates:Insert template": false,
-      "command-palette:Open command palette": false
+      "command-palette:Open command palette": false,
+      "obsidian-excalidraw-plugin:Create new drawing": false,
+      "table-editor-obsidian:Advanced Tables Toolbar": false,
+      "obsidian-day-planner:Timeline": false,
+      "omnisearch:Omnisearch": false,
+      "file-tree-alternative:File Tree Alternative Plugin": false
     }
   },
-  "active": "ba30447990268e5f",
+  "active": "8fea2a27798aa786",
   "lastOpenFiles": [
     "Referenze.md",
+    "Dubbi.md",
+    "Untitled",
+    "Spaces/Home",
+    "Spaces",
+    "Untitled.canvas",
+    "2024-02-02.md",
     "Welcome.md"
   ]
 }
