@@ -13,7 +13,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Dubbi.md",
+                "file": "Referenze.md",
                 "mode": "source",
                 "source": false
               }
@@ -89,7 +89,8 @@
               "state": {}
             }
           }
-        ]
+        ],
+        "currentTab": 4
       }
     ],
     "direction": "horizontal",
@@ -109,7 +110,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Dubbi.md",
+                "file": "Referenze.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -126,7 +127,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Dubbi.md",
+                "file": "Referenze.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -149,7 +150,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Dubbi.md"
+                "file": "Referenze.md"
               }
             }
           },
@@ -185,12 +186,12 @@
   },
   "active": "8fea2a27798aa786",
   "lastOpenFiles": [
-    "Pasted image 20240202164420.png",
-    "Referenze.md",
     "Dubbi.md",
-    "Untitled",
+    "Referenze.md",
     "Spaces/Home",
     "Spaces",
+    "Pasted image 20240202164420.png",
+    "Untitled",
     "Untitled.canvas",
     "2024-02-02.md",
     "Welcome.md"
