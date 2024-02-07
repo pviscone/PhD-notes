@@ -18,8 +18,21 @@
                 "source": false
               }
             }
+          },
+          {
+            "id": "c60990d5ad6b60e0",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Referenze.md",
+                "mode": "source",
+                "source": false
+              }
+            }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -184,10 +197,11 @@
       "file-tree-alternative:File Tree Alternative Plugin": false
     }
   },
-  "active": "8fea2a27798aa786",
+  "active": "c60990d5ad6b60e0",
   "lastOpenFiles": [
-    "Dubbi.md",
+    "NTuplizing.md",
     "Referenze.md",
+    "Dubbi.md",
     "Spaces/Home",
     "Spaces",
     "Pasted image 20240202164420.png",

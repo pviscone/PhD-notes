@@ -59,7 +59,8 @@
   "waypoints": [
     "Spaces/Home",
     "/",
-    "spaces://$tags"
+    "spaces://$tags",
+    "Spaces"
   ],
   "spacesUseAlias": false,
   "fmKeyAlias": "aliases",
