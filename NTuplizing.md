@@ -32,3 +32,27 @@ Aggiungere customize per flat table che salvi tutto il contenuto dei CrystalClus
  c’e’ una nuova versione dei XstalClusters prodotta dal producer:
 
 [https://github.com/cms-sw/cmssw/blob/master/L1Trigger/L1CaloTrigger/plugins/Phase2L1CaloEGammaEmulator.cc](https://github.com/cms-sw/cmssw/blob/master/L1Trigger/L1CaloTrigger/plugins/Phase2L1CaloEGammaEmulator.cc)
+
+
+## File
+/eos/cms/store/cmst3/group/l1tr/cerminar/14_0_X/fpinputs_131X/v2/DoubleElectron_FlatPt-1To100_PU200/inputs131X_10.root
+
+NON FUNZIONA
+## Errori compilazione fastpuppi
+
+-lcrypto
+-lssl
+
+
+```
+[Type/Paste Your Code](<%3E> Building shared library tmp/el8_amd64_gcc12/src/FastPUPPI/NtupleProducer/src/FastPUPPINtupleProducer/libFastPUPPINtupleProducer.so
+/cvmfs/cms.cern.ch/el8_amd64_gcc12/external/gcc/12.3.1-40d504be6370b5a30e3947a6e575ca28/bin/../lib/gcc/x86_64-redhat-linux-gnu/12.3.1/../../../../x86_64-redhat-linux-gnu/bin/ld.bfd: cannot find -lssl: No such file or directory
+/cvmfs/cms.cern.ch/el8_amd64_gcc12/external/gcc/12.3.1-40d504be6370b5a30e3947a6e575ca28/bin/../lib/gcc/x86_64-redhat-linux-gnu/12.3.1/../../../../x86_64-redhat-linux-gnu/bin/ld.bfd: cannot find -lcrypto: No such file or directory
+collect2: error: ld returned 1 exit status
+gmake: *** [config/SCRAM/GMake/Makefile.rules:1803: tmp/el8_amd64_gcc12/src/FastPUPPI/NtupleProducer/src/FastPUPPINtupleProducer/libFastPUPPINtupleProducer.so] Error 1
+gmake: *** [There are compilation/build errors. Please see the detail log above.] Error 2>)
+```
+
+
+---
+Le funzioni bisogna chiamarle alla fine dello script. Non conviene fare un accrocchio con argparse?
