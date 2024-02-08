@@ -37,8 +37,10 @@ Aggiungere customize per flat table che salvi tutto il contenuto dei CrystalClus
 ## File
 /eos/cms/store/cmst3/group/l1tr/cerminar/14_0_X/fpinputs_131X/v2/DoubleElectron_FlatPt-1To100_PU200/inputs131X_10.root
 
-NON FUNZIONA
+NON FUNZIONA, usa quelli di default presenti nello script
 ## Errori compilazione fastpuppi
+
+Se hai degli errori su vocms1000 compila tramite singularity cmssw-el8 -- scram b -j 4
 
 -lcrypto
 -lssl
@@ -56,3 +58,18 @@ gmake: *** [There are compilation/build errors. Please see the detail log above.
 
 ---
 Le funzioni bisogna chiamarle alla fine dello script. Non conviene fare un accrocchio con argparse?
+
+
+---
+
+CaloCrystalCluster dataformat:
+https://github.com/cms-sw/cmssw/blob/93f14ae8b3fa6fb1cf1a14c73f651f6b01d17340/DataFormats/L1TCalorimeterPhase2/interface/CaloCrystalCluster.h#L100
+
+Phase2L1CaloEGammaEmulator.cc producer source 
+(
+da qui prendo label GCT linea 633 (guarda anche 502)
+Constructor definition linea 455)
+https://github.com/cms-sw/cmssw/blob/93f14ae8b3fa6fb1cf1a14c73f651f6b01d17340/L1Trigger/L1CaloTrigger/plugins/Phase2L1CaloEGammaEmulator.cc#L95
+
+
+EDProducer in .py di Phase2L1CaloEGammaEmulator non pervenuto. Esiste l1tPhase2L1CaloEGammaEmulator che pero prende da Phase2L1CaloPFClusterEmulator
