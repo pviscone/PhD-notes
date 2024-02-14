@@ -31,3 +31,5 @@ Sottomissione su crab o HTCondor: [NtupleAnalysis](https://github.com/cerminar/n
 [EG firmware](https://codimd.web.cern.ch/XQFbvo-NRXe8WiO0_DoIDg#)
 
 [TWiki CMG L1T-Phase2](https://twiki.cern.ch/twiki/bin/view/CMS/CMGL1TriggerPhase2)
+
+[Interface Documents](https://twiki.cern.ch/twiki/bin/viewauth/CMS/L1TriggerPhase2Correlator#Interface_documents)

@@ -62,6 +62,8 @@ Le funzioni bisogna chiamarle alla fine dello script. Non conviene fare un accro
 
 ---
 
+Aggiunto"keep *_l1tPhase2L1CaloEGammaEmulator_*_*", allo skim
+
 CaloCrystalCluster dataformat:
 https://github.com/cms-sw/cmssw/blob/93f14ae8b3fa6fb1cf1a14c73f651f6b01d17340/DataFormats/L1TCalorimeterPhase2/interface/CaloCrystalCluster.h#L100
 
@@ -73,3 +75,10 @@ https://github.com/cms-sw/cmssw/blob/93f14ae8b3fa6fb1cf1a14c73f651f6b01d17340/L1
 
 
 EDProducer in .py di Phase2L1CaloEGammaEmulator non pervenuto. Esiste l1tPhase2L1CaloEGammaEmulator che pero prende da Phase2L1CaloPFClusterEmulator
+
+
+Pull request che ha aggiunto i cosicluster
+https://github.com/cms-l1t-offline/cmssw/pull/1069/files
+
+Esempio di analyzer sui calocluster
+https://github.com/skkwan/phase2-l1Calo-analyzer
