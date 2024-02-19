@@ -5,6 +5,9 @@ from coffea.nanoevents import NanoEventsFactory, NanoAODSchema
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Activation, BatchNormalization
 from tensorflow.keras.optimizers import Adam
+import numba as nb
+import pandas as pd
+import pickle
 
 events = NanoEventsFactory.from_root(
     {"Nano.root": "Events"},
@@ -24,11 +27,43 @@ GenEle=toCaloVar(ak.with_name(GenEle,"PtEtaPhiMLorentzVector"))
 CryClu=ak.with_name(CryClu,"PtEtaPhiMLorentzVector")
 GenEle=GenEle[np.abs(GenEle.eta)<1.49]
 
+
 #%%
 dRcut=0.2
 
-CryCluNear,dR=CryClu.nearest(GenEle,return_metric=True)
-labels=(dR<dRcut)
+@nb.jit
+def delta_phi(phi1,phi2):
+    return (phi1-phi2+np.pi)%(2*np.pi)-np.pi
+
+@nb.jit
+def delta_r(phi1,phi2,eta1,eta2):
+    return np.sqrt((eta1-eta2)**2+delta_phi(phi1,phi2)**2)
+
+@nb.jit
+def label_builder(builder, CryClu,GenEle):
+    for event_idx in (range(len(CryClu))):
+        builder.begin_list()
+        cryclu=CryClu[event_idx]
+        res=np.zeros(len(cryclu),dtype=nb.int32)
+        for ele in GenEle[event_idx]:
+            dr=delta_r(np.array(ele.phi),
+                       np.array(cryclu.phi),
+                        np.array(ele.eta),
+                        np.array(cryclu.eta))
+            if np.sum(dr<dRcut)>=1:
+                pt_arr=np.array(cryclu.pt)
+                pt_arr[dr>=dRcut]=-1
+                res[np.argmax(pt_arr)]=1
+        for elem in res:
+            builder.append(elem)
+        builder.end_list()
+    return builder
+
+labels=label_builder(ak.ArrayBuilder(), CryClu, GenEle).snapshot()
+CryClu['labels']=labels
+
+#%%
+
 
 #!mvaQual is always 0
 #!electronWP is always 0
@@ -59,6 +94,16 @@ varDict={
             'phi',
             'pt',
             'puCorrPt'
+            'labels'
               ],
-    'labels':labels
 }
+
+
+
+dfDict={}
+for obj in varDict:
+    eval(f'nmax=ak.max(ak.num({obj}))')
+    obj=ak.pad_none(obj,nmax)
+    #Create pandas dataframe and save in the dict
+    
+#Save the dict with pickle
