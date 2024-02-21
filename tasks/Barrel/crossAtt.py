@@ -116,18 +116,21 @@ def plot_history(history,item):
     plt.grid()
     plt.show()
 
-
-model=build_model(dropout=0.05)
-history=compile_model(model,batch_size=128,epochs=15,learning_rate=0.001,validation_split=0.2)
-plot_history(history,'loss')
-# %%
+create=False
+if create:
+    model=build_model(dropout=0.05)
+    history=compile_model(model,batch_size=128,epochs=15,learning_rate=0.001,validation_split=0.2)
+    plot_history(history,'loss')
+else:
+    model=keras.models.load_model('model.keras')
+# %% #
 
 
 nev=len(Tk)
 y_pred = model.predict([CryClu[int(0.8*nev):], Tk[int(0.8*nev):], mask[int(0.8*nev):]])
 y_test = y[int(0.8*nev):]
 
-#%%
+#%% #!Plot trigger rate
 
 fpr, tpr, thresholds = roc_curve(y_test.ravel(), y_pred.ravel())
 #plot the eddiciecy vs trigger rate for phase 2
@@ -141,7 +144,7 @@ hep.cms.text("Phase2 Simulation")
 hep.cms.lumitext("PU200 (14 TeV)")
 
 
-#%%
+#%%#! Plot confusion matrix
 conf=confusion_matrix(y_test.ravel(),y_pred.ravel()>0.5,normalize='true')
 print(conf)
 plt.imshow(conf, cmap='Blues', interpolation='nearest')
@@ -151,7 +154,7 @@ plt.ylabel('True')
 plt.xticks([0,1],['Background','Signal'])
 plt.yticks([0,1],['Background','Signal'])
 
-#%% genPt eff
+#%%#!! Plot efficiency vs genPt
 
 def get(obj,var):
     idx=varDict[obj].index(var)
@@ -171,7 +174,7 @@ plt.grid()
 plt.xlabel('genPt [GeV]')
 plt.legend()
 
-#%%
+
 plt.figure()
 cen=(hSig[1][1:]+hSig[1][:-1])/2
 eff=hSigCorr[0]/hSig[0]
@@ -181,4 +184,45 @@ plt.xlabel('genPt [GeV]')
 plt.grid()
 plt.legend()
 
-# %%
+# %% #!Plot eta-phi efficiency
+
+eta=get('CryClu','eta')[int(0.8*nev):][y_test==1]
+phi=get('CryClu','phi')[int(0.8*nev):][y_test==1]
+
+
+bins=[15,10]
+h2d=np.histogram2d(phi.ravel(),eta.ravel(),bins=bins,range=((-3.14,3.14),(-1.5,1.5),))
+
+etaCorr=eta[y_pred[y_test==1,0]>0.5]
+phiCorr=phi[y_pred[y_test==1,0]>0.5]
+
+h2dCorr=np.histogram2d(phiCorr.ravel(),etaCorr.ravel(),bins=bins,range=((-3.14,3.14),(-1.5,1.5)))
+etaPhiEff=np.nan_to_num(h2dCorr[0]/h2d[0],0)
+
+
+#plt.figure(figsize=(6,15))
+plt.imshow(etaPhiEff,extent=(-1.5,1.5,-3.14,3.14),origin='lower',cmap='viridis')
+plt.colorbar(label='Efficiency')
+plt.ylabel('$\phi$')
+plt.xlabel('$\eta$')
+
+
+#%%
+import corner
+import matplotlib.lines as mlines
+CryCluTest=CryClu[int(0.8*nev):]
+CryCluTest=np.reshape(CryCluTest,(CryCluTest.shape[0]*CryCluTest.shape[1],CryCluTest.shape[2]))
+
+CryCluTest=CryCluTest[y_test.ravel()==1]
+
+CryCluRight=CryCluTest[y_pred[y_test==1,0]>0.5]
+CryCluWrong=CryCluTest[y_pred[y_test==1,0]<0.5]
+
+
+fig=corner.corner(CryCluRight,labels=varDict['CryClu'],label_kwargs={'fontsize':14},levels=(0.5,0.9, 0.99),  color='tab:blue')
+
+corner.corner(CryCluWrong,labels=varDict['CryClu'],fig=fig,levels=(0.5,0.9, 0.99), color='tab:orange')
+
+blue_line = mlines.Line2D([], [], color='tab:blue', label='Signal TP')
+red_line = mlines.Line2D([], [], color='tab:orange', label='Signal misclassified')
+plt.legend(handles=[blue_line,red_line],loc='upper right',frameon=False,bbox_to_anchor=(1,5),fontsize=25)
