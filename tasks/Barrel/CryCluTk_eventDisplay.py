@@ -60,8 +60,8 @@ inAcceptanceMask = ak.num(GenEle) > 0
 GenEle = GenEle[inAcceptanceMask]
 CryClu = events.CaloCryCluGCT.compute()[inAcceptanceMask]
 Tk = events.DecTkBarrel.compute()[inAcceptanceMask]
-# Tk["phi"] = Tk.caloPhi
-# Tk["eta"] = Tk.caloEta
+Tk["phi"] = Tk.caloPhi
+Tk["eta"] = Tk.caloEta
 
 CryClu["label"] = label_builder(ak.ArrayBuilder(), CryClu, GenEle).snapshot()
 Tk["label"] = label_builder(
