@@ -1,2 +1,4 @@
 */.trash/*
 *.root
+**/.envs/
+**/__pycache__/
