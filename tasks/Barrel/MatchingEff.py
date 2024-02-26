@@ -16,99 +16,184 @@ events = NanoEventsFactory.from_root(
 ).events()
 
 
-@nb.jit
+#!REMOVE THIS, debug only
+# events=events[:2]
+def flat(akarr):
+    return ak.to_numpy(ak.drop_none(ak.flatten(akarr)))
+
+
+@nb.jit(nopython=True)
 def delta_phi(phi1, phi2):
     return (phi1 - phi2 + np.pi) % (2 * np.pi) - np.pi
 
 
-@nb.jit
+@nb.jit(nopython=True)
 def delta_r(phi1, phi2, eta1, eta2):
     return np.sqrt((eta1 - eta2) ** 2 + delta_phi(phi1, phi2) ** 2)
 
-#-1 = not matched, else index of the genEle
-@nb.jit
-def label_builder(builder, Obj, GenEle,dRcut):
+def snapshot_wrapper(func):
+    def wrapper(*args, **kwargs):
+        res12, res21 = func(*args, **kwargs)
+        return res12.snapshot(), res21.snapshot()
+    return wrapper
+
+@snapshot_wrapper
+@nb.jit(nopython=True)
+def label_builder(builder12, builder21, Obj, ObjToLoopOn, dRcut):
     for event_idx in range(len(Obj)):
-        builder.begin_list()
+        builder12.begin_list()
+        builder21.begin_list()
         obj = Obj[event_idx]
-        res = np.ones(len(obj), dtype=nb.int32)*-1
-        for idx,ele in enumerate(GenEle[event_idx]):
+        res12 = np.ones(len(obj), dtype=nb.int32) * -1
+        res21 = np.ones(len(ObjToLoopOn[event_idx]), dtype=nb.int32) * -1
+        for idx, ele in enumerate(ObjToLoopOn[event_idx]):
             dr = delta_r(
                 np.array(ele.phi),
                 np.array(obj.phi),
                 np.array(ele.eta),
                 np.array(obj.eta),
             )
-            # For each genEle, match the objwith dR<0.2 and the hightest pt
+            # For each objToLoopOn, match the objwith dR<0.2 and the hightest pt
             if np.sum(dr < dRcut) >= 1:
                 pt_arr = np.array(obj.pt)
                 pt_arr[dr >= dRcut] = -1
-                res[np.argmax(pt_arr)] = idx
-        for elem in res:
-            builder.append(elem)
-        builder.end_list()
-    return builder
+                if np.max(pt_arr) > res12[np.argmax(pt_arr)]:
+                    res12[np.argmax(pt_arr)] = idx
+                res21[idx] = np.argmax(pt_arr)
+        for elem in res12:
+            if elem == -1:
+                builder12.append(None)
+            else:
+                builder12.append(elem)
+        for elem in res21:
+            if elem == -1:
+                builder21.append(None)
+            else:
+                builder21.append(elem)
+        builder12.end_list()
+        builder21.end_list()
+    return builder12, builder21
 
 
-GenEle = events.GenEl.compute()
+# %%
+GenEle = events.GenEl
 GenEle = GenEle[np.abs(GenEle.eta) < 1.48]
 inAcceptanceMask = ak.num(GenEle) > 0
 
 GenEle = GenEle[inAcceptanceMask]
-CryClu = events.CaloCryCluGCT.compute()[inAcceptanceMask]
-Tk = events.DecTkBarrel.compute()[inAcceptanceMask]
-GenEle['phi']=GenEle.calophi
-GenEle['eta']=GenEle.caloeta
-Tk['phi']=Tk.caloPhi
-Tk['eta']=Tk.caloEta
+CryClu = events.CaloCryCluGCT[inAcceptanceMask]
+Tk = events.DecTkBarrel[inAcceptanceMask]
+TkEle = events.TkEleL2[inAcceptanceMask]
+GenEle["phi"] = GenEle.calophi
+GenEle["eta"] = GenEle.caloeta
+Tk["phi"] = Tk.caloPhi
+Tk["eta"] = Tk.caloEta
 
-#%%
-CryClu["GenIdx"] = label_builder(
-    ak.ArrayBuilder(),
-    CryClu,
-    GenEle,
-    dRcut=0.2
-).snapshot()
-Tk["CryCluIdx"] = label_builder(
-    ak.ArrayBuilder(),
-    Tk,
-    CryClu,
-    dRcut=0.4
-).snapshot()
-Tk["GenIdx"] = label_builder(
-    ak.ArrayBuilder(),
-    Tk,
-    GenEle,
-    dRcut=0.2
-).snapshot()
 
-#%%
+Tk = Tk.compute()
+CryClu = CryClu.compute()
+GenEle = GenEle.compute()
+TkEle=TkEle.compute()
 
-def plot_efficiencies(Gen,CryClu,Tk,bins=50):
-    tk_gen=GenEle[Tk.GenIdx[Tk.GenIdx > -1]]
-    cc_gen=GenEle[CryClu.GenIdx[CryClu.GenIdx > -1]]
-    tk_cc=CryClu[Tk.CryCluIdx[Tk.CryCluIdx > -1]]
-    tk_cc_gen = GenEle[tk_cc.GenIdx[tk_cc.GenIdx > -1]]
-    
+
+
+# %%
+
+
+CryClu["GenIdx"], GenEle["CryCluIdx"] = label_builder(
+    ak.ArrayBuilder(), ak.ArrayBuilder(), CryClu, GenEle, dRcut=0.2
+)
+
+Tk["CryCluIdx"], CryClu["TkIdx"] = label_builder(
+    ak.ArrayBuilder(), ak.ArrayBuilder(), Tk, CryClu, dRcut=0.2
+)
+Tk["GenIdx"], GenEle["TkIdx"] = label_builder(
+    ak.ArrayBuilder(), ak.ArrayBuilder(), Tk, GenEle, dRcut=0.2
+)
+
+TkEle["GenIdx"], GenEle["TkEleIdx"] = label_builder(
+    ak.ArrayBuilder(), ak.ArrayBuilder(), TkEle, GenEle, dRcut=0.2
+)
+
+
+# %%
+
+
+def plot_efficiencies(Gen, CryClu, Tk, bins=50,ax=None):
+    tk_gen = Gen[Tk.GenIdx]
+    cc_gen = Gen[CryClu.GenIdx]
+    tk_cc_gen = Gen[Tk[CryClu[Gen.CryCluIdx].TkIdx].GenIdx]
+
+    tkele_gen = Gen[TkEle.GenIdx]
+
     genHist, genEdges = np.histogram(Gen.pt, bins=bins, range=(0, 100))
     centers = (genEdges[:-1] + genEdges[1:]) / 2
-    
+
     tk_genHist, _ = np.histogram(ak.flatten(tk_gen).pt, bins=genEdges)
     cc_genHist, _ = np.histogram(ak.flatten(cc_gen).pt, bins=genEdges)
     tk_cc_genHist, _ = np.histogram(ak.flatten(tk_cc_gen).pt, bins=genEdges)
+    tkele_genHist, _ = np.histogram(ak.flatten(tkele_gen).pt, bins=genEdges)
 
-    
-    fig,ax=plt.subplots()
-    ax.step(centers,cc_genHist/genHist,where="mid",label="CryClu-Gen")
-    ax.step(centers,tk_genHist/genHist,where="mid",label="Tk-Gen")
-    ax.step(centers,tk_cc_genHist/genHist,where="mid",label="Tk-CryClu-Gen")
+    if ax is None:
+        _, ax = plt.subplots()
+        ax.set_xlabel("GenEle $p_T$ [GeV]")
+
+    ax.step(centers, cc_genHist / genHist, where="mid", label="CryClu-Gen")
+    ax.step(centers, tk_genHist / genHist, where="mid", label="Tk-Gen")
+    ax.step(centers, tk_cc_genHist / genHist, where="mid", label="Tk-CryClu-Gen")
+    ax.step(centers, tkele_genHist / genHist, where="mid", label="TkEle-Gen",)
     ax.legend()
-    ax.set_xlabel("GenEle pt [GeV]")
     ax.set_ylabel("Efficiency")
     ax.grid()
-plot_efficiencies(GenEle,CryClu,Tk,bins=100)
-    
-#probabilmente tk-cryclu-gen è sbagliato
+    return ax
+
+
+fig,ax=plt.subplots(2,2,figsize=(10,10))
+
+plot_efficiencies(GenEle, CryClu, Tk, bins=100,ax=ax[0,0])
+
+
 # quello che faccio è per ogni cryclu, matcho un tk. Devovedificare che entrambi matchano lo stesso genEle
 
+#!Plot matched CryClu pt vs gen pt
+ax[0, 1].hist2d(
+    flat(CryClu[GenEle.CryCluIdx].pt),
+    flat(GenEle[CryClu.GenIdx].pt),
+    bins=(75, 75),
+)
+
+
+#!Plot matched Tk pt vs Gen pt
+
+
+ax[1,0].hist2d(
+    flat(GenEle[Tk.GenIdx].pt),
+    flat(Tk[GenEle.TkIdx].pt),
+    bins=(75, 75),
+    range=((0, 100), (0, 100)),
+)
+
+
+matched_cc = CryClu[GenEle.CryCluIdx]
+cc_tkidx=ak.drop_none(matched_cc.TkIdx)
+
+
+ax[1,1].hist2d(
+    flat(CryClu[Tk[cc_tkidx].CryCluIdx].pt),
+    flat(Tk[cc_tkidx].pt),
+    bins=(75, 75),
+    range=((0, 100), (0, 100)),
+)
+ax[1,1].yaxis.tick_right()
+ax[0, 1].yaxis.tick_right()
+ax[0, 1].yaxis.set_label_position("right")
+ax[1, 1].yaxis.set_label_position("right")
+ax[0, 1].set_ylabel("GenEle $p_T$")
+ax[1, 1].set_ylabel("Tk $p_T$")
+ax[1,0].set_ylabel("Tk $p_T$")
+
+ax[1,0].set_xlabel("GenEle $p_T$")
+ax[1,1].set_xlabel("Matched CryClu $p_T$")
+hep.cms.text("Phase-2 Simulation",ax=ax[0,0],fontsize=20)
 #%%
+

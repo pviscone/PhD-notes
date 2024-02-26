@@ -75,6 +75,17 @@ Tk = Tk[ak.argsort(Tk.pt, ascending=False)]
 
 
 # %%
+import re
+
+
+
+def divide(s,n):
+    def divide_by_ten(match):
+        number = float(match.group())
+        return str(number / n)
+    return re.sub(r"\d+\.?\d*", divide_by_ten, s)
+
+
 #!plot for one event the Cry clu and the Tk in eta phi
 def CryTk_etaphi(Gen, CryClu, Tk, nev, markersize=10):
     fig, ax = plt.subplots()
@@ -117,11 +128,14 @@ def CryTk_etaphi(Gen, CryClu, Tk, nev, markersize=10):
     ax.set_xlabel("$\eta$")
     ax.set_ylabel("$\phi$")
     plt.grid()
-    hep.cms.text("Phase2 Simulation", ax=ax)
-    hep.cms.lumitext(f"PU=200, $\Delta R={dRcut}$", ax=ax)
+    hep.cms.text("Simulation", ax=ax)
+    hep.cms.lumitext(f"PU=200, $\Delta R={dRcut}$, ev: {nev}", ax=ax)
     ax.set_axisbelow(True)
 
     handles, labels = scatter.legend_elements(prop="sizes")
+
+    labels=[divide(label, markersize) for label in labels]
+    print(labels)
     ax.legend(
         handles, labels, loc="center left", bbox_to_anchor=(1, 0.5), title="$p_T$ [GeV]"
     )
@@ -135,7 +149,7 @@ def dR_dPt(Gen, CryClu, Tk, nev):
     tk = Tk[nev]
 
     CryCluSig = cc[cc.label == 1]
-    
+
     fig,ax =plt.subplots(2,1)
     for idx,cryclu in enumerate(CryCluSig):
         dr=delta_r(np.array(cryclu.eta),
@@ -145,7 +159,7 @@ def dR_dPt(Gen, CryClu, Tk, nev):
                     )
         drSig = dr[tk.label == 1]
         drBkg = dr[tk.label == 0]
-        
+
         dpt= cryclu.pt-tk.pt
         dptSig = dpt[tk.label == 1]
         dptBkg = dpt[tk.label == 0]
@@ -174,7 +188,7 @@ def dR_dPt(Gen, CryClu, Tk, nev):
 
 for i in range(10):
     CryTk_etaphi(GenEle, CryClu, Tk, i)
-    dR_dPt(GenEle, CryClu, Tk, i)
+    #dR_dPt(GenEle, CryClu, Tk, i)
     plt.show()
 
 
