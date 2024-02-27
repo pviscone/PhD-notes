@@ -2,3 +2,4 @@
 *.root
 **/.envs/
 **/__pycache__/
+*.p
