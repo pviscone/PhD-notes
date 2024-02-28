@@ -4,7 +4,10 @@ from coffea.nanoevents import NanoEventsFactory, NanoAODSchema
 import matplotlib.pyplot as plt
 import mplhep as hep
 import numpy as np
-import numba as nb
+import importlib
+import utils
+importlib.reload(utils)
+from utils import flat, delta_r, label_builder, snapshot_wrapper
 
 
 hep.style.use("CMS")
@@ -15,67 +18,6 @@ events = NanoEventsFactory.from_root(
     schemaclass=NanoAODSchema,
 ).events()
 
-
-#!REMOVE THIS, debug only
-# events=events[:2]
-def flat(akarr):
-    return ak.to_numpy(ak.drop_none(ak.flatten(akarr)))
-
-
-@nb.jit(nopython=True)
-def delta_phi(phi1, phi2):
-    return (phi1 - phi2 + np.pi) % (2 * np.pi) - np.pi
-
-
-@nb.jit(nopython=True)
-def delta_r(phi1, phi2, eta1, eta2):
-    return np.sqrt((eta1 - eta2) ** 2 + delta_phi(phi1, phi2) ** 2)
-
-def snapshot_wrapper(func):
-    def wrapper(*args, **kwargs):
-        res12, res21 = func(*args, **kwargs)
-        return res12.snapshot(), res21.snapshot()
-    return wrapper
-
-@snapshot_wrapper
-@nb.jit(nopython=True)
-def label_builder(builder12, builder21, Obj, ObjToLoopOn, dRcut):
-    for event_idx in range(len(Obj)):
-        builder12.begin_list()
-        builder21.begin_list()
-        obj = Obj[event_idx]
-        res12 = np.ones(len(obj), dtype=nb.int32) * -1
-        res21 = np.ones(len(ObjToLoopOn[event_idx]), dtype=nb.int32) * -1
-        for idx, ele in enumerate(ObjToLoopOn[event_idx]):
-            dr = delta_r(
-                np.array(ele.phi),
-                np.array(obj.phi),
-                np.array(ele.eta),
-                np.array(obj.eta),
-            )
-            # For each objToLoopOn, match the objwith dR<0.2 and the hightest pt
-            if np.sum(dr < dRcut) >= 1:
-                pt_arr = np.array(obj.pt)
-                pt_arr[dr >= dRcut] = -1
-                if np.max(pt_arr) > res12[np.argmax(pt_arr)]:
-                    res12[np.argmax(pt_arr)] = idx
-                res21[idx] = np.argmax(pt_arr)
-        for elem in res12:
-            if elem == -1:
-                builder12.append(None)
-            else:
-                builder12.append(elem)
-        for elem in res21:
-            if elem == -1:
-                builder21.append(None)
-            else:
-                builder21.append(elem)
-        builder12.end_list()
-        builder21.end_list()
-    return builder12, builder21
-
-
-# %%
 GenEle = events.GenEl
 GenEle = GenEle[np.abs(GenEle.eta) < 1.48]
 inAcceptanceMask = ak.num(GenEle) > 0
@@ -95,24 +37,22 @@ CryClu = CryClu.compute()
 GenEle = GenEle.compute()
 TkEle=TkEle.compute()
 
-
-
 # %%
 
 
 CryClu["GenIdx"], GenEle["CryCluIdx"] = label_builder(
-    ak.ArrayBuilder(), ak.ArrayBuilder(), CryClu, GenEle, dRcut=0.2
+    ak.ArrayBuilder(), ak.ArrayBuilder(), CryClu, GenEle, dRcut=0.1
 )
 
 Tk["CryCluIdx"], CryClu["TkIdx"] = label_builder(
-    ak.ArrayBuilder(), ak.ArrayBuilder(), Tk, CryClu, dRcut=0.2
+    ak.ArrayBuilder(), ak.ArrayBuilder(), Tk, CryClu, dRcut=0.1
 )
 Tk["GenIdx"], GenEle["TkIdx"] = label_builder(
-    ak.ArrayBuilder(), ak.ArrayBuilder(), Tk, GenEle, dRcut=0.2
+    ak.ArrayBuilder(), ak.ArrayBuilder(), Tk, GenEle, dRcut=0.1
 )
 
 TkEle["GenIdx"], GenEle["TkEleIdx"] = label_builder(
-    ak.ArrayBuilder(), ak.ArrayBuilder(), TkEle, GenEle, dRcut=0.2
+    ak.ArrayBuilder(), ak.ArrayBuilder(), TkEle, GenEle, dRcut=0.1
 )
 
 
@@ -152,9 +92,7 @@ fig,ax=plt.subplots(2,2,figsize=(10,10))
 
 plot_efficiencies(GenEle, CryClu, Tk, bins=100,ax=ax[0,0])
 
-
 # quello che faccio è per ogni cryclu, matcho un tk. Devovedificare che entrambi matchano lo stesso genEle
-
 #!Plot matched CryClu pt vs gen pt
 ax[0, 1].hist2d(
     flat(CryClu[GenEle.CryCluIdx].pt),
@@ -162,10 +100,7 @@ ax[0, 1].hist2d(
     bins=(75, 75),
 )
 
-
 #!Plot matched Tk pt vs Gen pt
-
-
 ax[1,0].hist2d(
     flat(GenEle[Tk.GenIdx].pt),
     flat(Tk[GenEle.TkIdx].pt),
@@ -173,10 +108,8 @@ ax[1,0].hist2d(
     range=((0, 100), (0, 100)),
 )
 
-
 matched_cc = CryClu[GenEle.CryCluIdx]
 cc_tkidx=ak.drop_none(matched_cc.TkIdx)
-
 
 ax[1,1].hist2d(
     flat(CryClu[Tk[cc_tkidx].CryCluIdx].pt),
@@ -196,4 +129,74 @@ ax[1,0].set_xlabel("GenEle $p_T$")
 ax[1,1].set_xlabel("Matched CryClu $p_T$")
 hep.cms.text("Phase-2 Simulation",ax=ax[0,0],fontsize=20)
 #%%
+#!dR plot
+dR_cc_gen = delta_r(
+    flat(GenEle.calophi[~ak.is_none(GenEle.CryCluIdx, axis=1)]),
+    flat(CryClu.phi[GenEle.CryCluIdx]),
+    flat(GenEle.caloeta[~ak.is_none(GenEle.CryCluIdx, axis=1)]),
+    flat(CryClu.eta[GenEle.CryCluIdx]),
+)
+
+dR_tk_gen = delta_r(
+    flat(GenEle.calophi[~ak.is_none(GenEle.TkIdx, axis=1)]),
+    flat(Tk.phi[GenEle.TkIdx]),
+    flat(GenEle.caloeta[~ak.is_none(GenEle.TkIdx, axis=1)]),
+    flat(Tk.eta[GenEle.TkIdx]),
+)
+
+cc = CryClu[GenEle.CryCluIdx]
+cc=cc[~ak.is_none(cc.TkIdx,axis=1)]
+tk=Tk[cc.TkIdx]
+dR_tk_cc = delta_r(
+    flat(cc.phi),
+    flat(tk.phi),
+    flat(cc.eta),
+    flat(tk.eta),
+)
+
+plt.hist([dR_cc_gen, dR_tk_gen, dR_tk_cc], bins=20, histtype="step", label=["CryClu-Gen", "Tk-Gen", "Tk-CryClu"],linewidth=2)
+plt.legend()
+plt.yscale("log")
+plt.xlabel("$\Delta R$")
+hep.cms.text("Phase-2 Simulation",fontsize=20)
+
+#%%#!BINNED dr  CC-Tk in gen pt
+
+
+
+pt_bins = np.linspace(0, 50, 7)
+
+stack=[]
+labels=[]
+for edge1,edge2 in zip(pt_bins[:-1],pt_bins[1:]):
+    mask = ((GenEle.pt) > edge1) & ((GenEle.pt) < edge2)
+    gen=GenEle[mask]
+    cc=CryClu[gen.CryCluIdx]
+    cc=cc[~ak.is_none(cc.TkIdx,axis=1)]
+    cc=cc[~ak.is_none(cc.GenIdx,axis=1)]
+    tk=Tk[cc.TkIdx]
+    dR_tk_cc = delta_r(
+        flat(cc.phi),
+        flat(tk.phi),
+        flat(cc.eta),
+        flat(tk.eta),
+    )
+    stack.append(dR_tk_cc)
+    labels.append(f"{edge1:.1f} < Gen $p_T$ < {edge2:.1f}")
+
+fig,axes=plt.subplots(len(stack),1,sharex=True,figsize=(10,30))
+plt.subplots_adjust(hspace=0)
+for idx,ax in enumerate(axes):
+    ax.hist(stack[idx], bins=20, label=labels[idx],linewidth=2,histtype="step",range=(0,0.2))
+    ax.legend()
+    ax.set_yscale("log")
+    ax.grid()
+
+    if idx!=len(stack)-1:
+        ax.set_xticklabels([])
+    else:
+        ax.set_xticklabels([0]+[f"{i:.2f}" for i in np.linspace(0,0.2,5)])
+hep.cms.text("Phase-2 Simulation",fontsize=20,ax=axes[0])
+axes[-1].set_xlabel("$\Delta R$")
+
 
