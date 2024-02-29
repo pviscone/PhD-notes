@@ -7,7 +7,7 @@ import numpy as np
 import importlib
 import utils
 importlib.reload(utils)
-from utils import flat, delta_r, label_builder, snapshot_wrapper
+from utils import flat, delta_r, label_builder  # noqa: E402
 
 
 hep.style.use("CMS")

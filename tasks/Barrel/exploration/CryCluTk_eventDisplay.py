@@ -14,7 +14,7 @@ dRcut = 0.2
 
 
 events = NanoEventsFactory.from_root(
-    {"Nano.root": "Events"},
+    {"../Nano.root": "Events"},
     schemaclass=NanoAODSchema,
 ).events()
 
