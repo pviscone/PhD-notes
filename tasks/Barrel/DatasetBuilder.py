@@ -37,6 +37,8 @@ features = [
     "Tk_vz",
     "CCTk_dR",
     "CCTk_dPt",
+    "CCTk_PtRatio",
+    "CryClu_pt",
     "CryClu_label",
     "CryClu_genPt",
     "CryClu_evIdx",
@@ -49,68 +51,77 @@ save = False
 
 
 # %%
+def build_df(features=features, root_file="Nano.root", save=False):
+    events = NanoEventsFactory.from_root(
+        {root_file: "Events"},
+        schemaclass=NanoAODSchema,
+    ).events()
 
 
-events = NanoEventsFactory.from_root(
-    {"Nano.root": "Events"},
-    schemaclass=NanoAODSchema,
-).events()
+    GenEle = events.GenEl
+    GenEle = GenEle[np.abs(GenEle.eta) < 1.48]
+    inAcceptanceMask = ak.num(GenEle) > 0
+    events = events[inAcceptanceMask]
+
+    GenEle = GenEle[inAcceptanceMask].compute()
+    CryClu = events.CaloCryCluGCT.compute()
+    Tk = events.DecTkBarrel.compute()
 
 
-GenEle = events.GenEl
-GenEle = GenEle[np.abs(GenEle.eta) < 1.48]
-inAcceptanceMask = ak.num(GenEle) > 0
-events = events[inAcceptanceMask]
+    CryClu["GenIdx"], GenEle["CryCluIdx"] = label_builder(
+        ak.ArrayBuilder(), ak.ArrayBuilder(), CryClu, GenEle, dRcut=dRcut_ccGen
+    )
 
-GenEle = GenEle[inAcceptanceMask].compute()
-CryClu = events.CaloCryCluGCT.compute()
-Tk = events.DecTkBarrel.compute()
+    Tk["CryCluIdx"], CryClu["TkIdx"] = label_builder(
+        ak.ArrayBuilder(), ak.ArrayBuilder(), Tk, CryClu, dRcut=dRcut_ccTk
+    )
 
-# %%
-CryClu["GenIdx"], GenEle["CryCluIdx"] = label_builder(
-    ak.ArrayBuilder(), ak.ArrayBuilder(), CryClu, GenEle, dRcut=dRcut_ccGen
-)
+    CryClu = CryClu[~ak.is_none(CryClu.TkIdx, axis=1)]
+    CryClu["label"] = ak.values_astype(ak.fill_none(CryClu.GenIdx, -1) > -1, int)
+    CryClu["showerShape"] = CryClu.e2x5 / CryClu.e5x5
+    Tk = Tk[CryClu.TkIdx]
+    CryClu["genPt"] = ak.fill_none(GenEle.pt[CryClu.GenIdx], -1)
+    CryClu["evIdx"]=evIdx(ak.ArrayBuilder(), CryClu)
 
-Tk["CryCluIdx"], CryClu["TkIdx"] = label_builder(
-    ak.ArrayBuilder(), ak.ArrayBuilder(), Tk, CryClu, dRcut=dRcut_ccTk
-)
+    CryClu = ak.flatten(CryClu)
+    Tk = ak.flatten(Tk)
 
-CryClu = CryClu[~ak.is_none(CryClu.TkIdx, axis=1)]
-CryClu["label"] = ak.values_astype(ak.fill_none(CryClu.GenIdx, -1) > -1, int)
-CryClu["showerShape"] = CryClu.e2x5 / CryClu.e5x5
-Tk = Tk[CryClu.TkIdx]
-CryClu["genPt"] = ak.fill_none(GenEle.pt[CryClu.GenIdx], -1)
-CryClu["evIdx"]=evIdx(ak.ArrayBuilder(), CryClu)
+    CCTk = ak.Array([{}] * len(CryClu))
+    CCTk["dR"] = delta_r(
+        ak.to_numpy(CryClu.phi, allow_missing=False),
+        ak.to_numpy(Tk.caloPhi, allow_missing=False),
+        ak.to_numpy(CryClu.eta, allow_missing=False),
+        ak.to_numpy(Tk.caloEta, allow_missing=False),
+    )
 
-# %%
-CryClu = ak.flatten(CryClu)
-Tk = ak.flatten(Tk)
+    CCTk["dPt"] = Tk.pt - CryClu.pt
+    CCTk["PtRatio"]=Tk.pt/CryClu.pt
 
-CCTk = ak.Array([{}] * len(CryClu))
-CCTk["dR"] = delta_r(
-    ak.to_numpy(CryClu.phi, allow_missing=False),
-    ak.to_numpy(Tk.caloPhi, allow_missing=False),
-    ak.to_numpy(CryClu.eta, allow_missing=False),
-    ak.to_numpy(Tk.caloEta, allow_missing=False),
-)
+    res = np.empty((len(Tk), 1))
+    for feature in features:
+        obj, feature = feature.split("_")
+        arr=eval(f"ak.to_numpy(ak.to_numpy({obj}.{feature},allow_missing=False))")
+        arr = np.expand_dims(arr, axis=1)
+        res = np.concatenate((res, arr), axis=1)
 
-CCTk["dPt"] = Tk.pt - CryClu.pt
-# %%
-res = np.empty((len(Tk), 1))
-for feature in features:
-    obj, feature = feature.split("_")
-    exec(f"arr=ak.to_numpy(ak.to_numpy({obj}.{feature},allow_missing=False))")
-    arr = np.expand_dims(arr, axis=1)
-    res = np.concatenate((res, arr), axis=1)
-
-res = res[:, 1:]
+    res = res[:, 1:]
 
 
-df = pd.DataFrame(res, columns=features)
-if save:
-    df.to_parquet(save)
+    df = pd.DataFrame(res, columns=features)
+    if save:
+        df.to_parquet(save)
+
+    return df
+
+
+if __name__ == "__main__":
+    df=build_df(save=save)
+
+
+
 
 # %% #! Plot input
+'''
 import matplotlib.lines as mlines
 import corner
 
@@ -143,3 +154,4 @@ plt.legend(
     bbox_to_anchor=(0.0, 1.0, 1.0, 0.0),
     loc=4,
 )
+'''
