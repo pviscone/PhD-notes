@@ -1,18 +1,15 @@
-Idee dalla piú facile alla piú complicata
-
-1. Semplice matching con dR dicryclu e tracce passando dR e dpt tra traccia e cluster alla rete.
-Capire come gestire mancanza di traccia matchata
-Il matching va fatto al cluster, forse per quello usare dr=0.4 (NO!!!!, prendi tracce che non c'entrano nulla)
-
-2. Matching tramite 1-nn nel piano dr-dpt,riscalando gli assi in modo da ottimizzare il matching.Passando sempre dpt e dr alla rete
-
-3. Knn e via di transformer o GNN
-
-4. Effettuare un reclustering 
+#### Dubbi
+- Devo fare diversi training a diversi tagli in pt? direi di no
 
 
-TODO:
-[] Studiare bene efficienze matching:
-    - CryClu al Gen
-    - Tk al CryClu
-    - Tk al CryClu con verifica del matching al gen
+## TODO
+
+#### General
+- [ ] Framework per considerare tutte le efficienze (taglio pt, matching, etc)
+- [ ] Aggiungere efficienze TkEle su tutto
+- [ ] Il dpt non é correlato con il pt? non é meglio mettere ratio? Fai plot pt-dpt e pt-ratio
+
+1. Vedi distribuzione cryclu pt su segnale e bkg
+2. Fai un taglio in pt conservativo prima del training
+3. Roc curve per diversi tagli in pt
+4. Trigger rate vs pt threshold a diversi WP
