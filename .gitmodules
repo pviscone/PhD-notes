@@ -1,0 +1,3 @@
+[submodule "submodules/submission"]
+	path = submodules/submission
+	url = https://github.com/cerminar/submission.git
