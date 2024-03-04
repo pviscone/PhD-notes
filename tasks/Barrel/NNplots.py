@@ -4,9 +4,9 @@ from sklearn.metrics import confusion_matrix
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from sklearn.metrics import roc_curve
 import numpy as np
+import awkward as ak
 import numba as nb
 from utils import snapshot_wrapper
-import awkward as ak
 
 hep.style.use("CMS")
 
@@ -40,7 +40,7 @@ def conf_matrix(y_pred, y_test, ax=False):
 
 
 # * 11245.6 * 2500 / 1e3
-def roc_plot(y_pred, y_test,*args, ax=False,xlim=False,scatter=True,**kwargs):
+def roc_plot(y_pred, y_test, *args, ax=False, xlim=False, scatter=True, **kwargs):
     if not ax:
         fig, ax = plt.subplots()
     fpr, tpr, tr = roc_curve(y_test.ravel(), y_pred.ravel(), drop_intermediate=False)
@@ -48,14 +48,15 @@ def roc_plot(y_pred, y_test,*args, ax=False,xlim=False,scatter=True,**kwargs):
 
     if scatter:
         # plot the eddiciecy vs trigger rate for phase 2
-        mappable = ax.scatter(fpr, tpr, c=tr, marker=".",*args,**kwargs)
-
+        mappable = ax.scatter(fpr, tpr, c=tr, marker=".", *args, **kwargs)
 
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(mappable, ax=ax, cax=cax, label="Threshold", orientation="vertical")
+        plt.colorbar(
+            mappable, ax=ax, cax=cax, label="Threshold", orientation="vertical"
+        )
     else:
-        ax.plot(fpr, tpr,*args,linewidth=2,**kwargs)
+        ax.plot(fpr, tpr, *args, linewidth=2, **kwargs)
 
     ax.set_xlabel("Bkg efficiency")
     ax.set_ylabel("Electron efficiency")
@@ -138,18 +139,10 @@ def loop_on_trs(func, *args, ax=False, trs=np.linspace(0.1, 3, 6), **kwargs):
     ax.grid()
     return ax
 
-def roc_pt(
-    y_pred,
-    y_test,
-    pt_cuts,
-    df_val,
-    xlim=(0.00008, 0.5),
-    log=True,
-    ax=False
-):
+
+def roc_pt(y_pred, y_test, pt_cuts, df_val, xlim=(0.00008, 0.5), log=True, ax=False):
     if not ax:
         _, ax = plt.subplots()
-
 
     for idx, pt in enumerate(pt_cuts):
         if idx > 5:
@@ -172,87 +165,96 @@ def roc_pt(
         ax.set_xlim(xlim)
     hep.cms.text("Phase-2 Simulation")
 
-#@snapshot_wrapper
-#@nb.jit
-def pt_score_ak(pt_builder,
-                y_pred_builder,
-                y_val_builder,
-                y_pred,
-                y_val,
-                pt,
-                ev_idx):
-    u,offset=np.unique(ev_idx,return_index=True)
-    offset=np.append(offset,len(ev_idx))
-    ev_lenghts=offset[1:]-offset[:-1]
 
-    counter=0
+#!Numba does not support reurn index true in unique, FIX!
+#Can i pass the offset from outside???
+@snapshot_wrapper
+@nb.jit
+def pt_score_ak(pt_builder, y_pred_builder, y_pred, pt, offset):
+    ev_lenghts = offset[1:] - offset[:-1]
+    counter = 0
     for lenght in ev_lenghts:
         pt_builder.begin_list()
-        y_val_builder.begin_list()
         y_pred_builder.begin_list()
         for i in range(lenght):
-            idx=counter+i
+            idx = counter + i
             pt_builder.append(pt[idx])
-            y_val_builder.append(y_val[idx])
             y_pred_builder.append(y_pred[idx])
         pt_builder.end_list()
-        y_val_builder.end_list()
         y_pred_builder.end_list()
-        counter+=lenght
-    return (
-        y_pred_builder.snapshot(),
-        y_val_builder.snapshot(),
-        pt_builder.snapshot()
-    )
+        counter += lenght
+    return (y_pred_builder, pt_builder)
 
 
-def rate_vs_pt(y_pred,
-    y_test,
-    df_val,
-    xlim=(0.00008, 0.5),
-    log=True,
-    ax=False):
+@nb.jit
+def rate_pt_res(pt_trs, pt, score, s):
+    res = []
+    for elem in pt_trs:
+        pt_mask = pt > elem
+        score_mask = score > s
+        mask = pt_mask & score_mask
+        fraction = sum(mask) / len(mask)
+        # rate
+        res.append(fraction * 11245.6 * 2500 / 1e3)
+    return res
+
+
+def rate_pt_plot(
+    y_pred,
+    df,
+    pt_trs=np.linspace(0, 40, 40),
+    score_trs=np.tanh(np.linspace(0.5, 6.5, 6)),
+    ax=False,
+):
     if not ax:
         _, ax = plt.subplots()
-    pt, score = pt_score_ak(ak.ArrayBuilder(),ak.ArrayBuilder(),y_pred,y_test,df_val["CryClu_evIdx"].to_numpy())
 
-    argmax=ak.argmax(pt,axis=1)
-    score=ak.flatten(score[argmax])
+    print("start")
+    ev_idx=df["CryClu_evIdx"].to_numpy()
+    _,offset = np.unique(ev_idx, return_index=True)
+    offset = np.append(offset, len(ev_idx))
+    score, pt = pt_score_ak(
+        ak.ArrayBuilder(),
+        ak.ArrayBuilder(),
+        y_pred,
+        df["CryClu_pt"].to_numpy(),
+        offset,
+    )
+    print("1")
+    score = ak.to_numpy(
+        score[ak.argmax(pt, axis=1, keepdims=True)], allow_missing=False
+    ).ravel()
+    print("2")
+    #!PERCHE SEMPLICEMENTE NON PRENDO MAX??????
+    pt = ak.to_numpy(
+        pt[ak.argmax(pt, axis=1, keepdims=True)], allow_missing=False
+    ).ravel()
+    print("3")
+    for idx, s in enumerate(score_trs):
+        if idx > 5:
+            style = "--"
+        else:
+            style = "-"
 
-
-
-
-
-"""
-def tr_binned_eff(y_pred,
-                  y_test,
-                  genpt,
-                  trs=np.linspace(0.1,3,6),ax=False):
-    if not ax:
-        _,ax = plt.subplots()
-
-
-    for tr in trs:
-
-        efficiency_plot(y_pred,
-                        y_test,
-                        genpt,
-                        threshold=np.tanh(tr),
-                        ax=ax,
-                        label=f"Threshold: {tr:.2f}")
-    ax.legend()
-    ax.set_ylim(-0.1,1.1)
+        """
+            res = []
+            for elem in pt_trs:
+                pt_mask = pt > elem
+                score_mask = score > s
+                mask = pt_mask & score_mask
+                fraction = sum(mask) / len(mask)
+                # rate
+                res.append(fraction * 11245.6 * 2500 / 1e3)
+        """
+        res = rate_pt_res(pt_trs, pt, score, s)
+        print(idx)
+        ax.plot(pt_trs, res, style, label=f"score > {np.arctanh(s):.2f}")
+    ax.set_xlabel("$p_T $ cut [GeV]")
+    ax.set_ylabel("Trigger Rate [kHz]")
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
     ax.grid()
-    return ax
-"""
-
-
-
-
-
-
-
-
-
+    # Put a legend to the right of the current axis
+    ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
 

@@ -1,15 +1,16 @@
 # %%
 import awkward as ak
 from coffea.nanoevents import NanoEventsFactory, NanoAODSchema
-import matplotlib.pyplot as plt
 import mplhep as hep
 import numpy as np
-import importlib
-import utils
 import pandas as pd
+from utils import  delta_r, label_builder, evIdx
 
-importlib.reload(utils)
-from utils import flat, delta_r, label_builder, snapshot_wrapper, evIdx
+
+
+sig = ""
+bkg = ""
+
 
 hep.style.use("CMS")
 NanoAODSchema.warn_missing_crossrefs = False
@@ -47,45 +48,57 @@ features = [
 dRcut_ccGen = 0.1
 dRcut_ccTk = 0.1
 save = False
-#save="CCTk_match.parquet"
+# save="CCTk_match.parquet"
 
 
 # %%
-def build_df(features=features, root_file="Nano.root", save=False):
+def build_df(features=features, root_file=None, save=False, dataset=None):
     events = NanoEventsFactory.from_root(
         {root_file: "Events"},
         schemaclass=NanoAODSchema,
     ).events()
 
+    assert root_file is str, "Root file must be a string"
+    assert (
+        dataset == "signal" or dataset == "background"
+    ), "Dataset must be either signal or background"
 
-    GenEle = events.GenEl
-    GenEle = GenEle[np.abs(GenEle.eta) < 1.48]
-    inAcceptanceMask = ak.num(GenEle) > 0
-    events = events[inAcceptanceMask]
-
-    GenEle = GenEle[inAcceptanceMask].compute()
     CryClu = events.CaloCryCluGCT.compute()
     Tk = events.DecTkBarrel.compute()
 
+    if dataset == "signal":
+        GenEle = events.GenEl
+        GenEle = GenEle[np.abs(GenEle.eta) < 1.48]
+        inAcceptanceMask = ak.num(GenEle) > 0
+        events = events[inAcceptanceMask]
+        GenEle = GenEle[inAcceptanceMask].compute()
 
-    CryClu["GenIdx"], GenEle["CryCluIdx"] = label_builder(
-        ak.ArrayBuilder(), ak.ArrayBuilder(), CryClu, GenEle, dRcut=dRcut_ccGen
-    )
+        CryClu["GenIdx"], GenEle["CryCluIdx"] = label_builder(
+            ak.ArrayBuilder(), ak.ArrayBuilder(), CryClu, GenEle, dRcut=dRcut_ccGen
+        )
+        CryClu["genPt"] = ak.fill_none(GenEle.pt[CryClu.GenIdx], -1)
+        CryClu= CryClu[~ak.is_none(CryClu.GenIdx, axis=1)]
+        CryClu["label"]=ak.ones_like(CryClu.GenIdx)
+
+    elif dataset == "background":
+        CryClu["label"]=ak.zeros_like(CryClu.pt)
+        CryClu["genPt"]=ak.ones_like(CryClu.pt)*-1
+
+
+
 
     Tk["CryCluIdx"], CryClu["TkIdx"] = label_builder(
         ak.ArrayBuilder(), ak.ArrayBuilder(), Tk, CryClu, dRcut=dRcut_ccTk
     )
-
     CryClu = CryClu[~ak.is_none(CryClu.TkIdx, axis=1)]
-    CryClu["label"] = ak.values_astype(ak.fill_none(CryClu.GenIdx, -1) > -1, int)
+
     CryClu["showerShape"] = CryClu.e2x5 / CryClu.e5x5
     Tk = Tk[CryClu.TkIdx]
-    CryClu["genPt"] = ak.fill_none(GenEle.pt[CryClu.GenIdx], -1)
-    CryClu["evIdx"]=evIdx(ak.ArrayBuilder(), CryClu)
+    CryClu["evIdx"] = evIdx(ak.ArrayBuilder(), CryClu)
+
 
     CryClu = ak.flatten(CryClu)
     Tk = ak.flatten(Tk)
-
     CCTk = ak.Array([{}] * len(CryClu))
     CCTk["dR"] = delta_r(
         ak.to_numpy(CryClu.phi, allow_missing=False),
@@ -95,17 +108,16 @@ def build_df(features=features, root_file="Nano.root", save=False):
     )
 
     CCTk["dPt"] = Tk.pt - CryClu.pt
-    CCTk["PtRatio"]=Tk.pt/CryClu.pt
+    #CCTk["PtRatio"] = Tk.pt / CryClu.pt
 
     res = np.empty((len(Tk), 1))
     for feature in features:
         obj, feature = feature.split("_")
-        arr=eval(f"ak.to_numpy(ak.to_numpy({obj}.{feature},allow_missing=False))")
+        arr = eval(f"ak.to_numpy(ak.to_numpy({obj}.{feature},allow_missing=False))")
         arr = np.expand_dims(arr, axis=1)
         res = np.concatenate((res, arr), axis=1)
 
     res = res[:, 1:]
-
 
     df = pd.DataFrame(res, columns=features)
     if save:
@@ -115,13 +127,18 @@ def build_df(features=features, root_file="Nano.root", save=False):
 
 
 if __name__ == "__main__":
-    df=build_df(save=save)
+    sig_df = build_df(root_file=sig,dataset="signal")
+    bkg_df = build_df(root_file=bkg,dataset="background")
 
+    #concatenate signal and background
+    df = pd.concat([sig_df,bkg_df])
 
+    if save:
+        df.to_parquet(save)
 
 
 # %% #! Plot input
-'''
+"""
 import matplotlib.lines as mlines
 import corner
 
@@ -154,4 +171,4 @@ plt.legend(
     bbox_to_anchor=(0.0, 1.0, 1.0, 0.0),
     loc=4,
 )
-'''
+"""
