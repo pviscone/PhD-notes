@@ -6,10 +6,12 @@ from sklearn.metrics import roc_curve
 import numpy as np
 import awkward as ak
 import numba as nb
-from utils import snapshot_wrapper
+from coffea.nanoevents import NanoEventsFactory, NanoAODSchema
+from utils import label_builder
 
 hep.style.use("CMS")
 
+root_signal="Nano.root"
 
 def plot_loss(history, ax=False):
     if not ax:
@@ -103,37 +105,69 @@ def out_plot(y_pred, y_test, bins=30, significance=False, ax=False):
     return ax
 
 
-def efficiency_plot(y_pred, y_test, genpt, threshold=0.5, label=None, ax=False):
+def efficiency_plot(y_pred,
+                    y_test,
+                    genpt,
+                    matchingCC=False,
+                    TkEle=False,
+                    threshold=0.5,
+                    bins=np.linspace(0,100,31),
+                    ax=False):
     if not ax:
         _, ax = plt.subplots()
 
-    genHist = np.histogram(genpt[y_test == 1], bins=50, range=(0, 100))
+    genHist = np.histogram(genpt[y_test == 1], bins=bins)
 
     genPredHist = np.histogram(
         genpt[np.bitwise_and(y_test == 1, (y_pred > threshold).astype(int) == y_test)],
-        bins=50,
-        range=(0, 100),
+        bins=bins
     )
+    
+    if TkEle:
+        tk_eff=get_matching_curve(bins,obj="TkEle")
+        centers = (genHist[1][:-1] + genHist[1][1:]) / 2
+        ax.step(
+            centers,
+            tk_eff,
+            where="mid",
+            label="TkEle",
+            linewidth=2,
+            linestyle="-.",
+            color="green"
+        )
+
+
+
+    if matchingCC:
+        scale=get_matching_curve(bins,obj="CryClu")
+    else:
+        scale=1
 
     centers = (genHist[1][:-1] + genHist[1][1:]) / 2
     ax.step(
         centers,
-        genPredHist[0] / genHist[0],
+        scale*genPredHist[0] / genHist[0],
         where="mid",
         label=f"Threshold: {np.arctanh(threshold):.2f}",
         linewidth=2,
     )
+
+
+
+
     ax.set_xlabel("genPt [GeV]")
     ax.set_ylabel("Efficiency")
     ax.grid()
     return ax
 
 
-def loop_on_trs(func, *args, ax=False, trs=np.linspace(0.1, 3, 6), **kwargs):
+def loop_on_trs(func, *args, ax=False, trs=np.linspace(0.1, 5, 4),TkEle=False, **kwargs):
     if not ax:
         _, ax = plt.subplots()
-    for tr in np.tanh(trs):
-        func(*args, threshold=tr, ax=ax, **kwargs)
+    for idx,tr in enumerate(np.tanh(trs)):
+        if idx>0:
+            TkEle=False
+        func(*args, threshold=tr, ax=ax, TkEle=TkEle, **kwargs)
     ax.legend()
     ax.set_ylim(-0.1, 1.1)
     ax.grid()
@@ -166,95 +200,142 @@ def roc_pt(y_pred, y_test, pt_cuts, df_val, xlim=(0.00008, 0.5), log=True, ax=Fa
     hep.cms.text("Phase-2 Simulation")
 
 
-#!Numba does not support reurn index true in unique, FIX!
-#Can i pass the offset from outside???
-@snapshot_wrapper
-@nb.jit
-def pt_score_ak(pt_builder, y_pred_builder, y_pred, pt, offset):
-    ev_lenghts = offset[1:] - offset[:-1]
-    counter = 0
-    for lenght in ev_lenghts:
-        pt_builder.begin_list()
-        y_pred_builder.begin_list()
-        for i in range(lenght):
-            idx = counter + i
-            pt_builder.append(pt[idx])
-            y_pred_builder.append(y_pred[idx])
-        pt_builder.end_list()
-        y_pred_builder.end_list()
-        counter += lenght
-    return (y_pred_builder, pt_builder)
 
 
 @nb.jit
-def rate_pt_res(pt_trs, pt, score, s):
-    res = []
-    for elem in pt_trs:
-        pt_mask = pt > elem
-        score_mask = score > s
-        mask = pt_mask & score_mask
-        fraction = sum(mask) / len(mask)
-        # rate
-        res.append(fraction * 11245.6 * 2500 / 1e3)
+def pt_y(ev_arr, pt_arr, y_arr):
+    ev_idx = np.unique(ev_arr)
+    nev = len(ev_idx)
+    res_pt = np.zeros(nev)
+    res_y = np.zeros(nev)
+    for idx, ev in enumerate(ev_idx):
+        mask = ev_arr == ev
+        arg = np.argmax(pt_arr[mask])
+        res_pt[idx] = pt_arr[mask][arg]
+        res_y[idx] = y_arr[mask][arg]
+    return res_pt, res_y
+
+
+@nb.jit
+def pt_cut(res_pt,res_y,pt_cuts,y_cuts):
+    res=np.zeros((len(pt_cuts),len(y_cuts)))
+
+    for pt_idx, pt in enumerate(pt_cuts):
+        pt_mask = res_pt > pt
+        for y_idx,y in enumerate(y_cuts):
+            y_mask = res_y > y
+            res[pt_idx,y_idx]=np.sum(np.bitwise_and(pt_mask,y_mask))/len(res_pt)
     return res
+
+
 
 
 def rate_pt_plot(
     y_pred,
     df,
-    pt_trs=np.linspace(0, 40, 40),
-    score_trs=np.tanh(np.linspace(0.5, 6.5, 6)),
+    pt_trs=np.linspace(0, 40, 20),
+    y_trs=np.tanh(np.linspace(0., 6.5, 6)),
+    log=False,
     ax=False,
 ):
     if not ax:
         _, ax = plt.subplots()
 
-    print("start")
-    ev_idx=df["CryClu_evIdx"].to_numpy()
-    _,offset = np.unique(ev_idx, return_index=True)
-    offset = np.append(offset, len(ev_idx))
-    score, pt = pt_score_ak(
-        ak.ArrayBuilder(),
-        ak.ArrayBuilder(),
-        y_pred,
-        df["CryClu_pt"].to_numpy(),
-        offset,
-    )
-    print("1")
-    score = ak.to_numpy(
-        score[ak.argmax(pt, axis=1, keepdims=True)], allow_missing=False
-    ).ravel()
-    print("2")
-    #!PERCHE SEMPLICEMENTE NON PRENDO MAX??????
-    pt = ak.to_numpy(
-        pt[ak.argmax(pt, axis=1, keepdims=True)], allow_missing=False
-    ).ravel()
-    print("3")
-    for idx, s in enumerate(score_trs):
+
+    ev_arr = df["CryClu_evIdx"].to_numpy()
+    pt_arr = df["CryClu_pt"].to_numpy()
+
+    res_pt, res_y = pt_y(ev_arr, pt_arr, y_pred)
+    mat = pt_cut(res_pt, res_y, pt_trs, y_trs) * 11245.6 * 2500 / 1e3
+
+    # *11245.6 * 2500 / 1e3
+    for idx, s in enumerate(y_trs):
         if idx > 5:
             style = "--"
         else:
             style = "-"
+        ax.plot(pt_trs, mat[:,idx], style, label=f"score > {np.arctanh(s):.2f}")
 
-        """
-            res = []
-            for elem in pt_trs:
-                pt_mask = pt > elem
-                score_mask = score > s
-                mask = pt_mask & score_mask
-                fraction = sum(mask) / len(mask)
-                # rate
-                res.append(fraction * 11245.6 * 2500 / 1e3)
-        """
-        res = rate_pt_res(pt_trs, pt, score, s)
-        print(idx)
-        ax.plot(pt_trs, res, style, label=f"score > {np.arctanh(s):.2f}")
+
     ax.set_xlabel("$p_T $ cut [GeV]")
     ax.set_ylabel("Trigger Rate [kHz]")
     box = ax.get_position()
     ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
     ax.grid()
+    if log:
+        ax.set_yscale("log")
     # Put a legend to the right of the current axis
     ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+
+
+
+def get_matching_curve(bins, obj=None):
+    assert obj=="CryClu" or obj=="TkEle"
+
+
+    events = NanoEventsFactory.from_root(
+        {root_signal: "Events"},
+        schemaclass=NanoAODSchema,
+    ).events()
+    GenEle = events.GenEl
+
+
+
+    GenEle = GenEle[np.abs(GenEle.eta) < 1.48]
+    inAcceptanceMask = ak.num(GenEle) > 0
+    GenEle = GenEle[inAcceptanceMask]
+    GenEle["phi"] = GenEle.calophi
+    GenEle["eta"] = GenEle.caloeta
+
+    GenEle = GenEle.compute()
+
+    if obj=="CryClu":
+
+
+        CryClu = events.CaloCryCluGCT[inAcceptanceMask]
+        Tk = events.DecTkBarrel[inAcceptanceMask]
+        Tk["phi"] = Tk.caloPhi
+        Tk["eta"] = Tk.caloEta
+        Tk = Tk.compute()
+        CryClu = CryClu.compute()
+        CryClu["GenIdx"], GenEle["CryCluIdx"] = label_builder(
+            ak.ArrayBuilder(),
+            ak.ArrayBuilder(),
+            CryClu,
+            GenEle,
+            dRcut=0.1
+        )
+        Tk["CryCluIdx"], CryClu["TkIdx"] = label_builder(
+            ak.ArrayBuilder(), ak.ArrayBuilder(), Tk, CryClu, dRcut=0.1
+        )
+        Tk["GenIdx"], GenEle["TkIdx"] = label_builder(
+            ak.ArrayBuilder(), ak.ArrayBuilder(), Tk, GenEle, dRcut=0.1
+        )
+
+        #tk_gen = GenEle[Tk.GenIdx]
+        #cc_gen = GenEle[CryClu.GenIdx]
+        tk_cc_gen = GenEle[Tk[CryClu[GenEle.CryCluIdx].TkIdx].GenIdx]
+        hist, _ = np.histogram(ak.flatten(tk_cc_gen).pt, bins=bins)
+
+    elif obj=="TkEle":
+        TkEle = events.TkEleL2[inAcceptanceMask]
+        TkEle = TkEle.compute()
+        TkEle["GenIdx"], GenEle["TkEleIdx"] = label_builder(
+            ak.ArrayBuilder(), ak.ArrayBuilder(), TkEle, GenEle, dRcut=0.1
+        )
+        tkele_gen = GenEle[TkEle.GenIdx]
+        hist, _ = np.histogram(ak.flatten(tkele_gen).pt, bins=bins)
+
+    genHist, _ = np.histogram(GenEle.pt, bins=bins, range=(0, 100))
+
+    return hist/genHist
+
+
+
+    # %%
+
+
+
+
 
 
