@@ -26,7 +26,7 @@ def snapshot_wrapper(func):
 
 
 @snapshot_wrapper
-@nb.jit(nopython=True)
+@nb.jit(nopython=True) #!CHANGE dtype if switch back to numba
 def label_builder(builder12, builder21, Obj, ObjToLoopOn, dRcut):
     for event_idx in range(len(Obj)):
         builder12.begin_list()
@@ -73,10 +73,10 @@ def snap_wrapper(func):
 
 @snap_wrapper
 @nb.jit(nopython=True)
-def evIdx(builder,obj):
+def evIdx(builder,obj,start=0):
     for ev in range(len(obj)):
         builder.begin_list()
-        res=np.ones(len(obj[ev]),dtype=nb.int32)*ev
+        res=np.ones(len(obj[ev]),dtype=nb.int32)*(ev+start)
         for elem in res:
             builder.append(elem)
         builder.end_list()

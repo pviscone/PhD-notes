@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split
 
 hep.style.use("CMS")
 
-df_name = "CCTk_match.parquet"
+df_name = "dataset.parquet"
 dropout = 0.05
 val_split = 0.2
 epochs = 50

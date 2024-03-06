@@ -8,8 +8,8 @@ from utils import  delta_r, label_builder, evIdx
 
 
 
-sig = ""
-bkg = ""
+sig = "DoubleElectrons131X.root"
+bkg = "MinBias131X.root"
 
 
 hep.style.use("CMS")
@@ -52,19 +52,16 @@ save = False
 
 
 # %%
-def build_df(features=features, root_file=None, save=False, dataset=None):
-    events = NanoEventsFactory.from_root(
-        {root_file: "Events"},
-        schemaclass=NanoAODSchema,
-    ).events()
+def build_df(features=features, root_file=None, save=False, dataset=None,start_idx=0):
 
-    assert root_file is str, "Root file must be a string"
     assert (
         dataset == "signal" or dataset == "background"
     ), "Dataset must be either signal or background"
 
-    CryClu = events.CaloCryCluGCT.compute()
-    Tk = events.DecTkBarrel.compute()
+    events = NanoEventsFactory.from_root(
+        {root_file: "Events"},
+        schemaclass=NanoAODSchema,
+    ).events()
 
     if dataset == "signal":
         GenEle = events.GenEl
@@ -72,6 +69,10 @@ def build_df(features=features, root_file=None, save=False, dataset=None):
         inAcceptanceMask = ak.num(GenEle) > 0
         events = events[inAcceptanceMask]
         GenEle = GenEle[inAcceptanceMask].compute()
+        CryClu = events.CaloCryCluGCT.compute()
+        Tk = events.DecTkBarrel.compute()
+
+
 
         CryClu["GenIdx"], GenEle["CryCluIdx"] = label_builder(
             ak.ArrayBuilder(), ak.ArrayBuilder(), CryClu, GenEle, dRcut=dRcut_ccGen
@@ -81,6 +82,9 @@ def build_df(features=features, root_file=None, save=False, dataset=None):
         CryClu["label"]=ak.ones_like(CryClu.GenIdx)
 
     elif dataset == "background":
+        CryClu = events.CaloCryCluGCT.compute()
+        Tk = events.DecTkBarrel.compute()
+
         CryClu["label"]=ak.zeros_like(CryClu.pt)
         CryClu["genPt"]=ak.ones_like(CryClu.pt)*-1
 
@@ -94,7 +98,7 @@ def build_df(features=features, root_file=None, save=False, dataset=None):
 
     CryClu["showerShape"] = CryClu.e2x5 / CryClu.e5x5
     Tk = Tk[CryClu.TkIdx]
-    CryClu["evIdx"] = evIdx(ak.ArrayBuilder(), CryClu)
+    CryClu["evIdx"] = evIdx(ak.ArrayBuilder(), CryClu,start=start_idx)
 
 
     CryClu = ak.flatten(CryClu)
@@ -108,7 +112,7 @@ def build_df(features=features, root_file=None, save=False, dataset=None):
     )
 
     CCTk["dPt"] = Tk.pt - CryClu.pt
-    #CCTk["PtRatio"] = Tk.pt / CryClu.pt
+    CCTk["PtRatio"] = Tk.pt / CryClu.pt
 
     res = np.empty((len(Tk), 1))
     for feature in features:
@@ -128,7 +132,8 @@ def build_df(features=features, root_file=None, save=False, dataset=None):
 
 if __name__ == "__main__":
     sig_df = build_df(root_file=sig,dataset="signal")
-    bkg_df = build_df(root_file=bkg,dataset="background")
+
+    bkg_df = build_df(root_file=bkg,dataset="background",start_idx=len(sig_df))
 
     #concatenate signal and background
     df = pd.concat([sig_df,bkg_df])
