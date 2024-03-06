@@ -11,7 +11,7 @@ from utils import label_builder
 
 hep.style.use("CMS")
 
-root_signal="Nano.root"
+root_signal = "DoubleElectrons131X.root"
 
 def plot_loss(history, ax=False):
     if not ax:
@@ -70,14 +70,14 @@ def roc_plot(y_pred, y_test, *args, ax=False, xlim=False, scatter=True, **kwargs
     return ax
 
 
-def out_plot(y_pred, y_test, bins=30, significance=False, ax=False):
+def out_plot(y_pred, y_test, bins=30, significance=False, ax=False,density=True):
     if not ax:
         fig, ax = plt.subplots()
     hs = ax.hist(
         y_pred[y_test == 1],
         bins=bins,
         histtype="step",
-        density=False,
+        density=density,
         label="Signal",
         linewidth=2,
     )
@@ -85,12 +85,15 @@ def out_plot(y_pred, y_test, bins=30, significance=False, ax=False):
         y_pred[y_test == 0],
         bins=bins,
         histtype="step",
-        density=False,
+        density=density,
         label="Background",
         linewidth=2,
     )
 
     ax.set_yscale("log")
+
+    if density:
+        ax.set_ylabel("Density")
 
     if significance:
         centers = (hs[1][:-1] + hs[1][1:]) / 2
@@ -122,19 +125,7 @@ def efficiency_plot(y_pred,
         genpt[np.bitwise_and(y_test == 1, (y_pred > threshold).astype(int) == y_test)],
         bins=bins
     )
-    
-    if TkEle:
-        tk_eff=get_matching_curve(bins,obj="TkEle")
-        centers = (genHist[1][:-1] + genHist[1][1:]) / 2
-        ax.step(
-            centers,
-            tk_eff,
-            where="mid",
-            label="TkEle",
-            linewidth=2,
-            linestyle="-.",
-            color="green"
-        )
+
 
 
 
@@ -152,8 +143,18 @@ def efficiency_plot(y_pred,
         linewidth=2,
     )
 
-
-
+    if TkEle:
+        tk_eff = get_matching_curve(bins, obj="TkEle")
+        centers = (genHist[1][:-1] + genHist[1][1:]) / 2
+        ax.step(
+            centers,
+            tk_eff,
+            where="mid",
+            label="TkEle",
+            linewidth=2,
+            linestyle="-.",
+            color="green",
+        )
 
     ax.set_xlabel("genPt [GeV]")
     ax.set_ylabel("Efficiency")
@@ -165,16 +166,18 @@ def loop_on_trs(func, *args, ax=False, trs=np.linspace(0.1, 5, 4),TkEle=False, *
     if not ax:
         _, ax = plt.subplots()
     for idx,tr in enumerate(np.tanh(trs)):
-        if idx>0:
-            TkEle=False
-        func(*args, threshold=tr, ax=ax, TkEle=TkEle, **kwargs)
+
+        if idx==len(trs)-1 and TkEle:
+            func(*args, threshold=tr, ax=ax, TkEle=True, **kwargs)
+        else:
+            func(*args, threshold=tr, ax=ax, TkEle=False, **kwargs)
     ax.legend()
     ax.set_ylim(-0.1, 1.1)
     ax.grid()
     return ax
 
 
-def roc_pt(y_pred, y_test, pt_cuts, df_val, xlim=(0.00008, 0.5), log=True, ax=False):
+def roc_pt(y_pred, y_test, pt_cuts, df_val, xlim=(0.000008, 0.1), log=True, ax=False):
     if not ax:
         _, ax = plt.subplots()
 
@@ -191,13 +194,14 @@ def roc_pt(y_pred, y_test, pt_cuts, df_val, xlim=(0.00008, 0.5), log=True, ax=Fa
             ax=ax,
             label=f"pt > {pt:.1f} GeV",
         )
-    ax.legend()
+    ax.legend(fontsize=18)
     if log:
         ax.set_xscale("log")
 
     if xlim:
         ax.set_xlim(xlim)
     hep.cms.text("Phase-2 Simulation")
+    return ax
 
 
 
@@ -233,8 +237,8 @@ def pt_cut(res_pt,res_y,pt_cuts,y_cuts):
 def rate_pt_plot(
     y_pred,
     df,
-    pt_trs=np.linspace(0, 40, 20),
-    y_trs=np.tanh(np.linspace(0., 6.5, 6)),
+    pt_trs=np.linspace(0, 40, 15),
+    y_trs=np.tanh(np.linspace(0., 6.5, 4)),
     log=False,
     ax=False,
 ):
@@ -250,6 +254,7 @@ def rate_pt_plot(
 
     # *11245.6 * 2500 / 1e3
     for idx, s in enumerate(y_trs):
+        print(idx)
         if idx > 5:
             style = "--"
         else:
@@ -266,6 +271,7 @@ def rate_pt_plot(
         ax.set_yscale("log")
     # Put a legend to the right of the current axis
     ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+    return ax
 
 
 
@@ -336,6 +342,15 @@ def get_matching_curve(bins, obj=None):
 
 
 
-
+def matching_plot(bins):
+    _, ax = plt.subplots()
+    centers = (bins[:-1] + bins[1:]) / 2
+    ax.step(centers, get_matching_curve(bins, obj="CryClu"), where='mid', label="CryClu")
+    ax.step(centers, get_matching_curve(bins, obj="TkEle"), where='mid', label="TkEle")
+    ax.set_xlabel("genPt [GeV]")
+    ax.set_ylabel("Matching Efficiency")
+    ax.grid()
+    ax.legend()
+    return ax
 
 

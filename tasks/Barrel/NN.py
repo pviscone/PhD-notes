@@ -12,7 +12,7 @@ from sklearn.model_selection import train_test_split
 hep.style.use("CMS")
 
 df_name = "dataset.parquet"
-dropout = 0.05
+dropout = 0.025
 val_split = 0.2
 epochs = 50
 lr = 0.001
@@ -20,7 +20,7 @@ batch_size = 512
 pt_cut_train = 0
 pt_cut_test = 0
 load = "NN.keras"
-load = False
+#load = False
 save = False
 
 random_seed = 666
@@ -107,29 +107,60 @@ y_pred_atanh[y_pred_atanh == np.inf] = max(y_pred_atanh[y_pred_atanh != np.inf])
 
 # %%
 importlib.reload(NNplots)
-NNplots.conf_matrix(y_pred, y_val)
+
+if not load:
+    NNplots.conf_matrix(y_pred, y_val)
+
 NNplots.roc_plot(y_pred, y_val, xlim=[-0.0005, 0.005])
-NNplots.out_plot(y_pred_atanh, y_val, significance=True)
+NNplots.out_plot(y_pred_atanh, y_val, significance=False)
 
 pt_cuts = np.array([0, 0.5, 1, 1.5, 2, 2.5, 3, 5, 10, 15, 20])
-NNplots.roc_pt(y_pred, y_val, pt_cuts, df_val)
+NNplots.roc_pt(y_pred, y_val, pt_cuts, df_val, xlim=(0.00008, 1))
 
 
 # %%
 importlib.reload(NNplots)
-#!! IL RATE FALLO SOLO CON BKG
-#!!TO FIX!
-NNplots.rate_pt_plot(y_pred, df_val)
+#!! TOO SLOW
+NNplots.rate_pt_plot(
+    y_pred[y_val == 0][:100000],
+    df_val[y_val == 0][:100000],
+    log=True,
+    y_trs=np.tanh(np.linspace(1, 4, 4)),
+    pt_trs=np.linspace(0, 40, 20),
+)
 
 #%%
+
 importlib.reload(NNplots)
-NNplots.loop_on_trs(
+ax_with_match=NNplots.loop_on_trs(
     NNplots.efficiency_plot,
     y_pred,
     y_val,
     df_val["CryClu_genPt"].to_numpy(),
-    trs=np.linspace(0.1, 5, 4),
+    trs=np.array([0.1,1,2,3,4]),
     bins=np.linspace(0, 100, 31),
     matchingCC=True,
     TkEle=True,
 )
+ax_with_match.set_title("Class*Match eff")
+ax_with_match.grid()
+#%%
+
+importlib.reload(NNplots)
+ax_not_matched = NNplots.loop_on_trs(
+    NNplots.efficiency_plot,
+    y_pred,
+    y_val,
+    df_val["CryClu_genPt"].to_numpy(),
+    trs=np.array([0.1,1,2,3,4]),
+    bins=np.linspace(0, 100, 31),
+    matchingCC=False,
+    TkEle=True,
+)
+ax_not_matched.set_title("Classification only eff")
+ax_not_matched.grid()
+# %%
+importlib.reload(NNplots)
+ax_match=NNplots.matching_plot(bins=np.linspace(0, 100, 31))
+ax_match.set_title("Match eff")
+# %%
