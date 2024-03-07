@@ -4,7 +4,7 @@ import numba as nb
 
 
 def flat(akarr):
-    return ak.to_numpy(ak.drop_none(ak.flatten(akarr)))
+    return ak.to_numpy(ak.drop_none(ak.flatten(akarr)),allow_missing=False)
 
 
 @nb.jit(nopython=True)

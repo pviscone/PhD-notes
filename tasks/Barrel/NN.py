@@ -164,3 +164,72 @@ importlib.reload(NNplots)
 ax_match=NNplots.matching_plot(bins=np.linspace(0, 100, 31))
 ax_match.set_title("Match eff")
 # %%
+
+import corner
+df_val["score"] = np.nan_to_num(np.arctanh(y_pred),8)
+
+df_sig = df_val[df_val["CryClu_label"] == 1].drop(columns=["CryClu_label","CryClu_evIdx"])
+df_bkg = df_val[df_val["CryClu_label"] == 0].drop(columns=["CryClu_label","CryClu_evIdx"])
+
+df_bkg["CryClu_genPt"] = np.random.normal(-1, 1e-5, size=len(df_bkg))
+
+labels=[key.split("_")[-1] for key in df_sig.keys()]
+
+
+
+import matplotlib.lines as mlines
+import matplotlib.pyplot as plt
+
+bins=[
+    10,
+    30,
+    30,
+    30,
+    15,
+    30,
+    50,
+    30,
+    40,
+    40,
+    40,
+    25,
+    50,
+    50,
+    50
+
+
+]
+h_range = [
+    [-0.1, 1.1],
+    [-0.1, 1.1],
+    [-3, 25],
+    [0, 70],
+    [-2, 12],
+    [-1, 7],
+    [-7, 70],
+    [-5, 15],
+    [-20, 20],
+    [-0.15, 0.6],
+    [-100, 40],
+    [-4, 20],
+    [-10, 110],
+    [-5, 110],
+    [-1,10],
+]
+
+
+fig=corner.corner(df_sig, labels=labels, color="tab:blue", levels=(0.5,0.9, 0.99), scale_hist=True,bins=bins,range=h_range,plot_density=True )
+
+corner.corner(df_bkg[:len(df_sig)], labels=labels, color="tab:orange", levels=(0.5,0.9, 0.99), scale_hist=True,bins=bins,range=h_range,plot_density=True, fig=fig)
+
+blue_line = mlines.Line2D([], [], color="tab:blue", label="Signal")
+red_line = mlines.Line2D([], [], color="tab:orange", label="Background")
+
+
+plt.legend(
+    handles=[blue_line, red_line],
+    loc="upper right",
+    frameon=False,
+    bbox_to_anchor=(1, 5),
+    fontsize=25,
+)
