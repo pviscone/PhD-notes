@@ -10,79 +10,30 @@
 
 ### NanoHistDump
 
-- Dask
+- [ ] Reformatting (spostare funzioni in una cartella function)
+
+- [ ] Add metadata 131X to sample name
+
+- Dask (**<u>ABORTED</u>**)
   
-  - [ ] Capire cosa sia delayed
+  X Capire cosa sia delayed
   
-  - [ ] Vedere come gestire npartition e in generale il grafo, capire se é feasible
+  X Vedere come gestire npartition e in generale il grafo, capire se é feasible
 
 - In alternativa
   
-  - [ ] Piallare dask e fare compute in lettura
+  - [x] Piallare dask e fare compute in lettura
   
-  - [ ] Leggere solo le collection presenti nel dict schema
+  - [x] Leggere solo le collection presenti nel dict schema
 
 - Implementare
   
   - [ ] Loop su selezioni
-
-- [ ] Reimplement renaming
-  
-  > Hi all! I hope you're having a wonderful day :slightly_smiling_face:
-  > 
-  > Is it possible/what are the ways to rename a dask awkward array read by Coffea? Perhaps Coffea has some mechanism to do this (while reading a tree)?
-  > 
-  > 1. We are reading it via from_root
-  >    
-  >    `akarray_new = NanoEventsFactory.from_root(self.tree, schemaclass=BaseSchema).events()`
-  > 
-  > self.tree is a **uproot.models.TTree.Model_TTree_v20 .** It is a tree from a .ROOT file.
-  > 
-  > 1. Before that we used:
-  > 
-  > `akarray_old = self.tree.arrays(names, library='ak', aliases=name_map, entry_start=self.file_entry, entry_stop=self.file_entry+entry_block)`
-  > 
-  > Where the aliases parameter would do the renaming for us. The structure being:
-  > 
-  > New field / old field (currently in the dask awkward array)
-  > 
-  > > {'eta': 'TkEleL2_eta',
-  > >  'pfIso': 'TkEleL2_pfIso',
-  > >  'pfIsoPV': 'TkEleL2_pfIsoPV',
-  > >  'phi': 'TkEleL2_phi',
-  > >  'pt': 'TkEleL2_pt',
-  > >  'puppiIso': 'TkEleL2_puppiIso',
-  > >  'puppiIsoPV': 'TkEleL2_puppiIsoPV',
-  > >  'tkEta': 'TkEleL2_tkEta',
-  > >  'tkIso': 'TkEleL2_tkIso',
-  > >  'tkIsoPV': 'TkEleL2_tkIsoPV',
-  > >  'tkPhi': 'TkEleL2_tkPhi',
-  > >  'tkPt': 'TkEleL2_tkPt',
-  > >  'vz': 'TkEleL2_vz',
-  > >  'charge': 'TkEleL2_charge',
-  > >  'hwQual': 'TkEleL2_hwQual'}.
-  > 
-  > Not doing the renaming would be very hard, as the generic .pt, .eta, .charge and others fields are used in many many different parts of the code.
-  > 
-  > P.S: I have a jupyter notebook prepared (in the dms), for who are interested.
-  > 
-  > All information is welcome. Cheers. Edited
-  > 
-  > Show more
-  > 
-  > Lindsey Gray
-  > 
-  > [14:54](https://mattermost.web.cern.ch/cms-exp/pl/4tn31x5d67fk8jdnx53x91qh1y)
-  > 
-  > With the naming scheme in the file you should be able to use NanoAODSchema. You'll have to add `TkEleL2` to NanoAODSchema.mixins ([coffea/src/coffea/nanoevents/schemas/nanoaod.py at master · CoffeaTeam/coffea · GitHub](https://github.com/CoffeaTeam/coffea/blob/master/src/coffea/nanoevents/schemas/nanoaod.py#L53)). Just set that before you make the NanoEvents instance. You can probably safely use PtEtaPhiMCollection as the target type for branches with various prefixes you're looking for.
-  > 
-  > [14:54](https://mattermost.web.cern.ch/cms-exp/pl/hhdowkeg4pnujdcdqjya1nt9ha)
-  > 
-  > There does need to be a `nTkEleL2` counter branch though. Does your tree have that?
+  - [ ] Multiprocessing su gruppi di file
 
 ### Plots
 
-- [ ] Fare classi per plotting
+- [ ] Fare classi per plotting per tipo (e.g. efficiency plot, standard hist 1d, std hist2d, etc.)
 
 - [ ] Capire come fare versioning plot
 
